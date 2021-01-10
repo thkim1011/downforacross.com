@@ -8,6 +8,7 @@ import Popup from './Popup';
 import Flex from 'react-flexview';
 import {Link} from 'react-router-dom';
 import swal from 'sweetalert';
+import {keybinds, vimModes} from '../Game/Game';
 
 export default class Toolbar extends Component {
   handleBlur = (e) => {
@@ -99,10 +100,20 @@ export default class Toolbar extends Component {
   }
 
   renderKeybindMenu() {
-    const {vimMode, vimInsert} = this.props;
+    const {keybind, vimMode} = this.props;
+    let label;
+    if (keybind === keybinds.NORMAL) {
+      label = 'Normal';
+    } else if (vimMode === vimModes.INSERT) {
+      label = 'Vim (Insert)';
+    } else if (vimMode === vimModes.COMMAND) {
+      label = 'Vim (Command)';
+    } else {
+      label = 'Vim';
+    }
     return (
       <ActionMenu
-        label={vimMode ? `Vim${vimInsert ? ' (Insert)' : ''}` : 'Normal'}
+        label={label}
         onBlur={this.handleBlur}
         actions={{
           Normal: this.keybind.bind(this, 'normal'),

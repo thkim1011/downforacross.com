@@ -3,6 +3,7 @@ import './css/gridControls.css';
 import React, {Component} from 'react';
 
 import GridObject from '../../lib/wrappers/GridWrapper';
+import {keybinds, vimModes} from '../Game/Game';
 
 function safe_while(condition, step, cap = 500) {
   while (condition() && cap >= 0) {
@@ -12,6 +13,39 @@ function safe_while(condition, step, cap = 500) {
 }
 
 export default class GridControls extends Component {
+  constructor() {
+    super();
+    this.rootCommandTrie = {
+      h: {isCommand: true, action: (shiftKey) => this.handleAction('left', shiftKey)},
+      j: {isCommand: true, action: (shiftKey) => this.handleAction('down', shiftKey)},
+      k: {isCommand: true, action: (shiftKey) => this.handleAction('up', shiftKey)},
+      l: {isCommand: true, action: (shiftKey) => this.handleAction('right', shiftKey)},
+      x: {isCommand: true, action: (shiftKey) => this.handleAction('delete', shiftKey)},
+      w: {isCommand: true, action: (shiftKey) => this.selectNextClue(false)},
+      b: {iscommand: true, action: (shiftKey) => this.selectNextClue(true)},
+      d: {
+        isCommand: false,
+        next: {
+          d: {
+            isCommand: true,
+            action: () => {
+              this.deleteWord();
+            },
+          },
+        },
+      },
+      ':': {
+        isCommand: true,
+        action: (shiftKey) => {
+          this.props.onSetVimMode(vimModes.COMMAND);
+          this.props.onSetCmdline(':');
+        },
+      },
+      i: {isCommand: true, action: (shiftKey) => this.props.onSetVimMode(vimModes.INSERT)},
+    };
+    this.commandTrie = this.rootCommandTrie;
+  }
+
   get grid() {
     return new GridObject(this.props.grid);
   }
@@ -169,49 +203,59 @@ export default class GridControls extends Component {
       ']': 'forward',
     };
 
-    const normalModeActionKeys = {
-      h: 'left',
-      j: 'down',
-      k: 'up',
-      l: 'right',
-      x: 'delete',
-    };
+    const {vimMode, onSetVimMode, cmdline, onSetCmdline, onPressEnter, onPressPeriod} = this.props;
 
-    const {onVimNormal, onVimInsert, vimInsert, onPressEnter, onPressPeriod} = this.props;
+    // handle universal keys first e.g. Enter, Arrow keys, etc.
     if (key in actionKeys) {
       this.handleAction(actionKeys[key], shiftKey);
       return true;
-    } else if (!vimInsert) {
-      if (key in normalModeActionKeys) {
-        this.handleAction(normalModeActionKeys[key], shiftKey);
-      } else if (key === 'w') {
-        this.selectNextClue(false);
-      } else if (key === 'b') {
-        this.selectNextClue(true);
-      } else if (key === 'i') {
-        onVimInsert && onVimInsert();
-      }
     } else if (key === '.') {
       onPressPeriod && onPressPeriod();
       return true;
-    } else if (key === 'Enter') {
-      onPressEnter && onPressEnter();
-      return true;
+      // } else if (key === 'Enter') {
+      // onPressEnter && onPressEnter();
+      // return true;
     } else if (key === 'Escape') {
-      onVimNormal && onVimNormal();
-    } else if (vimInsert && !this.props.frozen) {
+      onSetVimMode && onSetVimMode(vimModes.NORMAL);
+    }
+    // handle vim normal mode commands using command trie
+    else if (vimMode === vimModes.NORMAL) {
+      if (key in this.commandTrie) {
+        if (this.commandTrie[key].isCommand) {
+          this.commandTrie[key].action(shiftKey);
+        } else {
+          this.commandTrie = this.commandTrie[key].next;
+        }
+      } else {
+        this.commandTrie = this.rootCommandTrie;
+      }
+      return true;
+    }
+    // handle vim insert mode with default behavior
+    else if (vimMode === vimModes.INSERT && !this.props.frozen) {
       const letter = key.toUpperCase();
       if (this.validLetter(letter)) {
         this.typeLetter(letter, shiftKey);
         return true;
       }
     }
+    // handle vim command mode i.e. pressing ':' in normal mode
+    else if (vimMode === vimModes.COMMAND) {
+      if (key === 'Backspace') {
+        onSetCmdline(cmdline.slice(0, -1));
+      } else if (key === 'Enter') {
+        this.selectClue(parseInt(cmdline.slice(1, -1)), cmdline[-1] === 'd' ? 'down' : 'across');
+        onSetCmdline('');
+      } else {
+        onSetCmdline(cmdline + key);
+      }
+    }
   };
 
   // takes in a Keyboard Event
   handleKeyDown(ev) {
-    const {vimMode} = this.props;
-    const _handleKeyDown = vimMode ? this._handleKeyDownVim : this._handleKeyDown;
+    const {keybind} = this.props;
+    const _handleKeyDown = keybind == keybinds.VIM ? this._handleKeyDownVim : this._handleKeyDown;
 
     if (ev.target.tagName === 'INPUT' || ev.metaKey || ev.ctrlKey) {
       return;
@@ -307,6 +351,11 @@ export default class GridControls extends Component {
       return true;
     }
     return false;
+  }
+
+  deleteWord() {
+    let {r, c} = this.props.selected;
+    console.log('delete called');
   }
 
   backspace(shouldStay) {

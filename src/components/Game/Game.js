@@ -10,6 +10,18 @@ import Player from '../Player';
 import Toolbar from '../Toolbar';
 import {toArr} from '../../lib/jsUtils';
 import {toHex, darken, GREENISH} from '../../lib/colors';
+import {isIdentifierOrPrivateIdentifier} from 'typescript';
+
+export const keybinds = {
+  NORMAL: 'normal',
+  VIM: 'vim',
+};
+
+export const vimModes = {
+  INSERT: 'insert',
+  NORMAL: 'normal',
+  COMMAND: 'command',
+};
 
 // component for gameplay -- incl. grid/clues & toolbar
 export default class Game extends Component {
@@ -18,8 +30,8 @@ export default class Game extends Component {
     this.state = {
       pencilMode: false,
       screenWidth: 0,
-      vimMode: false,
-      vimInsert: false,
+      keybind: keybinds.NORMAL,
+      vimMode: vimModes.NORMAL,
     };
   }
 
@@ -134,21 +146,15 @@ export default class Game extends Component {
     this.props.gameModel.reset(scope);
   };
 
-  handleKeybind = (mode) => {
+  handleKeybind = (keybind) => {
     this.setState({
-      vimMode: mode === 'vim',
+      keybind,
     });
   };
 
-  handleVimInsert = () => {
+  handleVimMode = (vimMode) => {
     this.setState({
-      vimInsert: true,
-    });
-  };
-
-  handleVimNormal = () => {
-    this.setState({
-      vimInsert: false,
+      vimMode,
     });
   };
 
@@ -218,6 +224,10 @@ export default class Game extends Component {
           frozen: {
             backgroundColor: toHex(GREENISH),
           },
+          blinkingSelected: {
+            backgroundColor: myColor,
+            animation: 'blinking 1s step-start infinite',
+          },
         },
       },
     };
@@ -252,10 +262,10 @@ export default class Game extends Component {
         addPing={this.handleAddPing}
         onPressEnter={this.handlePressEnter}
         onPressPeriod={this.handlePressPeriod}
+        keybind={this.state.keybind}
         vimMode={this.state.vimMode}
-        vimInsert={this.state.vimInsert}
-        onVimInsert={this.handleVimInsert}
-        onVimNormal={this.handleVimNormal}
+        onSetKeybind={this.handleKeybind}
+        onSetVimMode={this.handleVimMode}
         mobile={mobile}
         pickups={this.props.pickups}
         optimisticCounter={optimisticCounter}
@@ -268,7 +278,7 @@ export default class Game extends Component {
     if (!this.game) return;
     const {clock} = this.game;
     const {mobile} = this.props;
-    const {pencilMode, vimMode, vimInsert} = this.state;
+    const {pencilMode, keybind, vimMode} = this.state;
     const {lastUpdated: startTime, totalTime: pausedTime, paused: isPaused} = clock;
     return (
       <Toolbar
@@ -278,8 +288,8 @@ export default class Game extends Component {
         pausedTime={pausedTime}
         isPaused={isPaused}
         pencilMode={pencilMode}
+        keybind={keybind}
         vimMode={vimMode}
-        vimInsert={vimInsert}
         onStartClock={this.handleStartClock}
         onPauseClock={this.handlePauseClock}
         onResetClock={this.handleResetClock}
